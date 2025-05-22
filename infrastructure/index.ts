@@ -2,6 +2,9 @@ import * as pulumi from '@pulumi/pulumi'
 import * as resources from '@pulumi/azure-native/resources'
 import * as containerregistry from '@pulumi/azure-native/containerregistry'
 import * as containerinstance from '@pulumi/azure-native/containerinstance'
+// Other imports at the top of the module
+import * as dockerBuild from '@pulumi/docker-build'
+
 
 // Import the configuration settings for the current stack.
 const config = new pulumi.Config()
@@ -41,12 +44,10 @@ const registryCredentials = containerregistry
     }
   })
 
-export const acrServer = registry.loginServer
-export const acrUsername = registryCredentials.username
 
 
-// Other imports at the top of the module
-import * as dockerBuild from '@pulumi/docker-build'
+
+
 
 // ... rest of the code
 
@@ -125,6 +126,8 @@ const containerGroup = new containerinstance.ContainerGroup(
 
 
 // Export the service's IP address, hostname, and fully-qualified URL.
+export const acrServer = registry.loginServer
+export const acrUsername = registryCredentials.username
 export const hostname = containerGroup.ipAddress.apply((addr) => addr!.fqdn!)
 export const ip = containerGroup.ipAddress.apply((addr) => addr!.ip!)
 export const url = containerGroup.ipAddress.apply(
