@@ -6,12 +6,6 @@ config:
   cst8918-a03-infra:cpu: "1"
   cst8918-a03-infra:memory: "2"
   cst8918-a03-infra:prefixName: "cst8918a03zhao0294"
-<<<<<<< HEAD
   cst8918-a03-infra:imageTag: "v0.3.0"
   cst8918-a03-infra:weatherApiKey:
     secure: AAABAP9e2kNUmGOZfn/YpEFhg7UM6xNCIIoqfR5b+6Z8ZYlie3Ehh+HXfCmVgeUKXoXZ4caeMx9aF69ilB4eqQ==
-=======
-  cst8918-a03-infra:imageTag: "v0.2.0"
-  cst8918-a03-infra:weatherApiKey:
-    secure: AAABAI7qxocoH640amfAW/3b0gTFv0DeLp7ziPxd0sppt+3s+dnQVlBeISStNsbHJPToy0NDkAgpr43ml6lW2g==
->>>>>>> origin/hybrid-h03
