@@ -115,7 +115,11 @@ const containerGroup = new containerinstance.ContainerGroup(
           },
           {
             name: 'WEATHER_API_KEY',
+<<<<<<< HEAD
             value: config.requireSecret('weatherApiKey'),
+=======
+            value: config.requireSecret('weatherApiKey')
+>>>>>>> origin/hybrid-h03
           },
           {
             name: 'REDIS_URL',
