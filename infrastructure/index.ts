@@ -1,26 +1,49 @@
-import * as pulumi from '@pulumi/pulumi'
-import * as resources from '@pulumi/azure-native/resources'
-import * as containerregistry from '@pulumi/azure-native/containerregistry'
-import * as containerinstance from '@pulumi/azure-native/containerinstance'
-// Other imports at the top of the module
-import * as dockerBuild from '@pulumi/docker-build'
-
+import * as pulumi from '@pulumi/pulumi';
+import * as resources from '@pulumi/azure-native/resources';
+import * as containerregistry from '@pulumi/azure-native/containerregistry';
+import * as containerinstance from '@pulumi/azure-native/containerinstance';
+import * as dockerBuild from '@pulumi/docker-build';
+import * as cache from '@pulumi/azure-native/redis';
 
 // Import the configuration settings for the current stack.
-const config = new pulumi.Config()
-const appPath = config.require('appPath')
-const prefixName = config.require('prefixName')
-const imageName = prefixName
-const imageTag = config.require('imageTag')
-// Azure container instances (ACI) service does not yet support port mapping
-// so, the containerPort and publicPort must be the same
-const containerPort = config.requireNumber('containerPort')
-const publicPort = config.requireNumber('publicPort')
-const cpu = config.requireNumber('cpu')
-const memory = config.requireNumber('memory')
+const config = new pulumi.Config();
+const appPath = config.require('appPath');
+const prefixName = config.require('prefixName');
+const imageName = prefixName;
+const imageTag = config.require('imageTag');
+const containerPort = config.requireNumber('containerPort');
+const publicPort = config.requireNumber('publicPort');
+const cpu = config.requireNumber('cpu');
+const memory = config.requireNumber('memory');
 
 // Create a resource group.
-const resourceGroup = new resources.ResourceGroup(`${prefixName}-rg`)
+const resourceGroup = new resources.ResourceGroup(`${prefixName}-rg`);
+
+// Create a managed Redis service
+const redis = new cache.Redis(`${prefixName}-redis`, {
+  name: `${prefixName}-weather-cache`,
+  location: 'westus3',
+  resourceGroupName: resourceGroup.name,
+  enableNonSslPort: true,
+  redisVersion: 'Latest',
+  minimumTlsVersion: '1.2',
+  redisConfiguration: {
+    maxmemoryPolicy: 'allkeys-lru'
+  },
+  sku: {
+    name: 'Basic',
+    family: 'C',
+    capacity: 0
+  }
+});
+
+// Extract the auth creds from the deployed Redis service
+const redisAccessKey = cache
+  .listRedisKeysOutput({ name: redis.name, resourceGroupName: resourceGroup.name })
+  .apply((keys: { primaryKey: string }) => keys.primaryKey);
+
+// Construct the Redis connection string
+const redisConnectionString = pulumi.interpolate`rediss://:${redisAccessKey}@${redis.hostName}:${redis.sslPort}`;
 
 // Create the container registry.
 const registry = new containerregistry.Registry(`${prefixName}ACR`, {
@@ -29,7 +52,7 @@ const registry = new containerregistry.Registry(`${prefixName}ACR`, {
   sku: {
     name: containerregistry.SkuName.Basic,
   },
-})
+});
 
 // Get the authentication credentials for the container registry.
 const registryCredentials = containerregistry
@@ -41,15 +64,8 @@ const registryCredentials = containerregistry
     return {
       username: creds.username!,
       password: creds.passwords![0].value!,
-    }
-  })
-
-
-
-
-
-
-// ... rest of the code
+    };
+  });
 
 // Define the container image for the service.
 const image = new dockerBuild.Image(`${prefixName}-image`, {
@@ -66,8 +82,7 @@ const image = new dockerBuild.Image(`${prefixName}-image`, {
       password: registryCredentials.password,
     },
   ],
-})
-
+});
 
 // Create a container group in the Azure Container App service and make it publicly accessible.
 const containerGroup = new containerinstance.ContainerGroup(
@@ -100,8 +115,12 @@ const containerGroup = new containerinstance.ContainerGroup(
           },
           {
             name: 'WEATHER_API_KEY',
-            value: '3fd6ad3fb258e8136255713991d90dab',
+            value: config.requireSecret('weatherApiKey'),
           },
+          {
+            name: 'REDIS_URL',
+            value: redisConnectionString
+          }
         ],
         resources: {
           requests: {
@@ -122,14 +141,13 @@ const containerGroup = new containerinstance.ContainerGroup(
       ],
     },
   },
-)
-
+);
 
 // Export the service's IP address, hostname, and fully-qualified URL.
-export const acrServer = registry.loginServer
-export const acrUsername = registryCredentials.username
-export const hostname = containerGroup.ipAddress.apply((addr) => addr!.fqdn!)
-export const ip = containerGroup.ipAddress.apply((addr) => addr!.ip!)
+export const acrServer = registry.loginServer;
+export const acrUsername = registryCredentials.username;
+export const hostname = containerGroup.ipAddress.apply((addr) => addr!.fqdn!);
+export const ip = containerGroup.ipAddress.apply((addr) => addr!.ip!);
 export const url = containerGroup.ipAddress.apply(
   (addr) => `http://${addr!.fqdn!}:${containerPort}`,
-)
+);
